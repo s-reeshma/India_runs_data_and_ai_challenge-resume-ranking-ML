@@ -39,3 +39,10 @@ A perfect resume is useless if the candidate is inactive. We parse the `redrob_s
 Install the required machine learning libraries:
 ```bash
 pip install -r requirements.txt
+
+### 🧪 Live Sandbox / Demo
+
+Want to see the ranking engine in action without installing anything locally? 
+You can run our exact pipeline on a sample dataset using our Google Colab environment:
+
+👉 **[Run Technyx Ranker in Google Colab](https://colab.research.google.com/drive/1bbacnUOKvEezPGhCVlUtaRm8_b_am8BJ?usp=sharing)**
