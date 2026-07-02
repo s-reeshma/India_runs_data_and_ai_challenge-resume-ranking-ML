@@ -1,35 +1,39 @@
-# 🏆 Redrob Hackathon: Intelligent Candidate Ranker
+# 🏆 REDROB AI: Intelligent Candidate Ranker
 
-This repository contains our submission for the **Intelligent Candidate Discovery & Ranking Challenge**. 
+This repository contains the final submission for the **Intelligent Candidate Discovery & Ranking Challenge**.
 
-Our solution moves beyond brittle keyword matching by implementing a **Two-Stage Retrieval & Behavioral Ranking Pipeline**. It evaluates candidates based on semantic capability fit and filters out "on-paper perfect" candidates who exhibit poor behavioral signals (keyword stuffers, unengaged users, ghosters).
+Our solution abandons brittle Applicant Tracking System (ATS) keyword matching in favor of a **Hybrid Semantic & Deterministic Ranking Pipeline**. It uses AI to understand true capability, while employing a rigorous Python rules engine to enforce business logic, penalize bad behavior, and sidestep explicit hackathon traps.
 
-## 🧠 Methodology: The Two-Stage Ranker
+## 🧠 Architecture Overview
 
-1. **Stage 1: Semantic Filtering (The "Fast Filter")**
-   We utilize dense vector embeddings (`all-MiniLM-L6-v2` via `sentence-transformers`) to calculate the cosine similarity between the Job Description and the candidates' flattened career/skills profiles. This catches candidates who have the right experience even if they don't use exact keyword matches.
+Our final ranking algorithm (`rank_candidates.py`) evaluates 100,000 candidates through a strict multi-stage pipeline:
 
-2. **Stage 2: Behavioral Multipliers (The "Trap Detector")**
-   Semantic fit is irrelevant if a candidate is unresponsive. We parse the `redrob_signals` object to apply mathematical penalties for red flags, such as:
-   * Low recruiter response rates (<20% heavily penalized)
-   * Poor interview completion histories
-   * Disengagement (not logging into the platform)
-   
-   Candidates actively looking for work (`open_to_work_flag`) receive a slight score boost.
+### Stage 1: Dense Semantic Search (Capability Matching)
+We use `all-MiniLM-L6-v2` to map candidates to a 384-dimensional semantic space.
+* **Query Optimization:** We engineered a dense vector query focusing strictly on core ML capabilities (RAG, vector retrieval, fine-tuning) to bypass token limits and maximize the signal-to-noise ratio.
+* **Candidate Flattening:** We parse skills, experience, and professional summaries to create a high-context string for the embedding model.
 
-## 📂 Repository Structure
+### Stage 2: The Deterministic Rules Engine (Heuristics)
+We apply hardcoded logic to adjust the baseline semantic score:
+* **The "Hidden Gem" Override:** If the AI determines a candidate is highly capable (Semantic Score >= 0.55), they receive a bonus and are *exempt* from strict keyword penalties, capturing high-potential prodigies.
+* **The Title Trap:** Candidates with non-technical titles (Marketing, Sales, HR, Recruiter) receive a massive `-0.60` penalty.
+* **The Job Hopper Trap:** Candidates with >2 jobs and an average tenure under 18 months are penalized (`-0.30`).
+* **The Closed-Source Veteran Trap:** Senior engineers (5+ years) with a missing/zero GitHub activity score are penalized (`-0.25`).
+* **Stackable Bonuses:** Candidates possessing explicit "nice-to-have" skills (LoRA, PEFT, XGBoost, etc.) receive cumulative `+0.03` boosts.
 
-* `cand_clas.py` - The core ranking engine (Embeddings + Behavioral logic + CSV export).
-* `requirements.txt` - Python dependencies needed to run the script.
-* `submission_metadata.yaml` - Challenge submission metadata and declarations.
-* `team_name.csv` - The final output of our top 100 ranked candidates.
-* `presentation.pdf` - Our 4-slide pitch deck explaining the architecture and reasoning.
+### Stage 3: Behavioral Multipliers
+A perfect resume is useless if the candidate is inactive. We parse the `redrob_signals` object to multiply the final score based on real-world behavior:
+* **Ghosting:** Recruiter response rates < 20% reduce the total score by 90% (`x0.1`).
+* **Flaking:** Interview completion rates < 50% reduce the total score by 80% (`x0.2`).
+* **Active Seekers:** The `open_to_work` flag applies a 20% boost.
+
+*Note: Final ties are broken by sorting `candidate_id` alphabetically to ensure 100% deterministic reproducibility.*
 
 ## 🚀 How to Run the Code
 
 ### Prerequisites
 1. Ensure you have Python 3.8+ installed.
-2. Download the `candidates.jsonl` file from the Hackathon dataset and place it in the root directory of this project. *(Note: This file is ignored in git due to size).*
+2. Place your `candidates.jsonl` file in the root directory.
 
 ### Installation
 Install the required machine learning libraries:
