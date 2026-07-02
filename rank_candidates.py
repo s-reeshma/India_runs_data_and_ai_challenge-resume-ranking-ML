@@ -1,10 +1,12 @@
 import json
-from sentence_transformers import SentenceTransformer,util 
+from sentence_transformers import SentenceTransformer, util 
 import torch
 import csv
+import multiprocessing
+import pandas as pd
+
 file_path = r"C:\Users\csekh\OneDrive\Desktop\[PUB] India_runs_data_and_ai_challenge (1)\[PUB] India_runs_data_and_ai_challenge\data\candidates.jsonl"
 
-candidates = []
 def calculate_explicit_modifiers(candidate, semantic_score):
     modifier = 0.0
     reasons = []
@@ -64,6 +66,7 @@ def calculate_explicit_modifiers(candidate, semantic_score):
 def flatten_candidate(candidate):
     skills_list = candidate.get('skills', [])
     skill_strings = []
+    name, prof, months = "", "", 0
     for skill in skills_list:
         name = skill.get('name', '')
         prof = skill.get('proficiency', '')
@@ -74,49 +77,7 @@ def flatten_candidate(candidate):
     title = profile.get('current_title', 'Unknown Title')
     exp = profile.get('years_of_experience', 0)
     return f"Title: {title}. Experience: {exp} years. Skills: {skills_text}"
-with open(file_path, 'r', encoding='utf-8') as file:
-    for line in file:
-        candidates.append(json.loads(line))
 
-print(f"Successfully loaded {len(candidates)} candidates!")
-print("Flattening data...")
-test_candidates = candidates
-texts_to_embed = [flatten_candidate(c) for c in test_candidates]
-print(f"First candidate looks like this to the AI:\n{texts_to_embed[0]}\n")
-print("Downloading/Loading Embedding Model (this takes a moment the first time)...")
-model = SentenceTransformer('all-MiniLM-L6-v2')
-print("Generating Vector Embeddings (turning text into numbers)...")
-candidate_embeddings = model.encode(texts_to_embed)
-print(f"Success! Generated {len(candidate_embeddings)} embeddings.")
-jd_text = """
-Senior AI Engineer. Deep technical depth in modern ML systems embeddings, 
-retrieval, ranking, LLMs, fine-tuning. Scrappy product-engineering attitude. 
-Willing to ship a working ranker in a week. Located in or willing to relocate 
-to Noida or Pune. Needs real engineering experience, not just AI keywords. 
-Must not be a purely non-technical role like Marketing Manager.
-"""
-print("\nEmbedding Job Description...")
-jd_embedding = model.encode(jd_text, convert_to_tensor=True)
-candidate_embeddings_tensor = torch.tensor(candidate_embeddings)
-print("Calculating Similarity Scores...")
-cosine_scores = util.cos_sim(jd_embedding, candidate_embeddings_tensor)[0]
-scored_candidates = []
-for i, candidate in enumerate(test_candidates): 
-    semantic_score = cosine_scores[i].item()
-    scored_candidates.append({
-        "candidate": candidate,
-        "semantic_score": semantic_score
-    })
-scored_candidates = sorted(scored_candidates, key=lambda x: x['semantic_score'], reverse=True)
-top_match = scored_candidates[0]
-top_candidate_id = top_match['candidate']['candidate_id']
-top_title = top_match['candidate']['profile']['current_title']
-top_score = top_match['semantic_score']
-print(f"\n--- SEMANTIC SEARCH COMPLETE ---")
-print(f"Top match ID: {top_candidate_id}")
-print(f"Top match Title: {top_title}")
-print(f"Top match Score: {top_score:.4f}")
-print("\nApplying Behavioral Traps & Multipliers...")
 def calculate_behavioral_multiplier(signals):
     multiplier = 1.0
     reasons = []
@@ -144,42 +105,102 @@ def calculate_behavioral_multiplier(signals):
         reasons.append("Inactivity Penalty")
         
     return multiplier, reasons
-for item in scored_candidates:
-    candidate = item['candidate']
-    signals = candidate.get('redrob_signals', {})
-    base_score = item['semantic_score']
-    
-    explicit_modifier, explicit_reasons = calculate_explicit_modifiers(candidate, base_score)
-    behavior_multiplier, behavior_reasons = calculate_behavioral_multiplier(signals)
-    
-    item['final_score'] = (base_score + explicit_modifier) * behavior_multiplier
-    
-    all_reasons = explicit_reasons + behavior_reasons
-    if not all_reasons:
-        all_reasons = ["Strong baseline match"]
-        
-    item['reasoning'] = ", ".join(all_reasons)
 
-scored_candidates.sort(key=lambda x: (-round(x['final_score'], 4), x['candidate']['candidate_id']))
-new_top = scored_candidates[0]
-print(f"--- BEHAVIORAL FILTER COMPLETE AND TRAPS IDENTIFIED ---")
-print(f"New Top match ID: {new_top['candidate']['candidate_id']}")
-print(f"New Top Title: {new_top['candidate']['profile']['current_title']}")
-print(f"New Top Score: {new_top['final_score']:.4f}")
-print("\nGenerating submission.csv...")
-output_filename = 'technyx.csv'
-with open(output_filename, 'w', newline='') as f:
-    writer = csv.writer(f)
-    writer.writerow(["candidate_id", "rank", "score", "reasoning"])
+def main():
+    candidates = []
+    with open(file_path, 'r', encoding='utf-8') as file:
+        for line in file:
+            candidates.append(json.loads(line))
+
+    print(f"Successfully loaded {len(candidates)} candidates!")
+    print("Flattening data...")
+    test_candidates = candidates
+    texts_to_embed = [flatten_candidate(c) for c in test_candidates]
+    print(f"First candidate looks like this to the AI:\n{texts_to_embed[0]}\n")
     
+    print("Downloading/Loading Embedding Model...")
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    
+    print("Configuring multi-processing pool across available CPU cores...")
+    num_cores = multiprocessing.cpu_count()
+    pool = model.start_multi_process_pool(target_devices=['cpu'] * num_cores)
+    
+    print(f"Generating Vector Embeddings using {num_cores} cores in parallel (this will be significantly faster)...")
+    candidate_embeddings = model.encode_multi_process(texts_to_embed, pool, batch_size=256)
+    model.stop_multi_process_pool(pool)
+    print(f"Success! Generated {len(candidate_embeddings)} embeddings.")
+    
+    jd_text = """
+    Senior AI Engineer. Deep technical depth in modern ML systems embeddings, 
+    retrieval, ranking, LLMs, fine-tuning. Scrappy product-engineering attitude. 
+    Willing to ship a working ranker in a week. Located in or willing to relocate 
+    to Noida or Pune. Needs real engineering experience, not just AI keywords. 
+    Must not be a purely non-technical role like Marketing Manager.
+    """
+    print("\nEmbedding Job Description...")
+    jd_embedding = model.encode(jd_text, convert_to_tensor=True)
+    candidate_embeddings_tensor = torch.tensor(candidate_embeddings)
+    
+    print("Calculating Similarity Scores...")
+    cosine_scores = util.cos_sim(jd_embedding, candidate_embeddings_tensor)[0]
+    scored_candidates = []
+    for i, candidate in enumerate(test_candidates): 
+        semantic_score = cosine_scores[i].item()
+        scored_candidates.append({
+            "candidate": candidate,
+            "semantic_score": semantic_score
+        })
+        
+    scored_candidates = sorted(scored_candidates, key=lambda x: x['semantic_score'], reverse=True)
+    top_match = scored_candidates[0]
+    top_candidate_id = top_match['candidate']['candidate_id']
+    top_title = top_match['candidate']['profile']['current_title']
+    top_score = top_match['semantic_score']
+    print(f"\n--- SEMANTIC SEARCH COMPLETE ---")
+    print(f"Top match ID: {top_candidate_id}")
+    print(f"Top match Title: {top_title}")
+    print(f"Top match Score: {top_score:.4f}")
+    
+    print("\nApplying Behavioral Traps & Multipliers...")
+    for item in scored_candidates:
+        candidate = item['candidate']
+        signals = candidate.get('redrob_signals', {})
+        base_score = item['semantic_score']
+        
+        explicit_modifier, explicit_reasons = calculate_explicit_modifiers(candidate, base_score)
+        behavior_multiplier, behavior_reasons = calculate_behavioral_multiplier(signals)
+        
+        item['final_score'] = (base_score + explicit_modifier) * behavior_multiplier
+        
+        all_reasons = explicit_reasons + behavior_reasons
+        if not all_reasons:
+            all_reasons = ["Strong baseline match"]
+            
+        item['reasoning'] = ", ".join(all_reasons)
+
+    scored_candidates.sort(key=lambda x: (-round(x['final_score'], 4), x['candidate']['candidate_id']))
+    new_top = scored_candidates[0]
+    print(f"--- BEHAVIORAL FILTER COMPLETE AND TRAPS IDENTIFIED ---")
+    print(f"New Top match ID: {new_top['candidate']['candidate_id']}")
+    print(f"New Top Title: {new_top['candidate']['profile']['current_title']}")
+    print(f"New Top Score: {new_top['final_score']:.4f}")
+    
+    print("\nGenerating technyx.xlsx...")
+    output_filename = 'technyx.xlsx'
+    output_rows = []
     for rank_index, item in enumerate(scored_candidates[:100]):
         candidate_id = item['candidate']['candidate_id']
         rank = rank_index + 1
         score = round(item['final_score'], 4)
         score = min(score, 0.9999) 
-        
         reasoning = item.get('reasoning', "Strong baseline match")
-        
-        writer.writerow([candidate_id, rank, f"{score:.4f}", reasoning])
+        output_rows.append([candidate_id, rank, score, reasoning])
 
-print(f"\nDone! Top 100 candidates saved to {output_filename}. Tie-breaker applied.")
+    df = pd.DataFrame(output_rows, columns=["candidate_id", "rank", "score", "reasoning"])
+    df.to_excel(output_filename, index=False)
+
+    print(f"\nDone! Top 100 candidates saved to {output_filename}. Tie-breaker applied.")
+
+if __name__ == '__main__':
+    multiprocessing.freeze_support()
+    main()
