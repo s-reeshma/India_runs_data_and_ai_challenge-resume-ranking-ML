@@ -1,0 +1,97 @@
+# Redrob Hackathon — Submission Metadata Template
+#
+# Copy this file to your repo root as `submission_metadata.yaml` and fill it in.
+# The fields here should match what you submit via the portal at upload time.
+# Stage 3 review uses this file to verify your portal metadata.
+
+# ============================================================================
+# Team identity
+# ============================================================================
+team_name: "Technyx"  # Used in leaderboard and announcements
+
+primary_contact:
+  name: "Sreeshma Chandrasekharan Nair"
+  email: "sreeshmanair87@gmail.com"   # Used for all organizer communication
+  phone: "+91-9301369624"        # Used for top-50 / top-10 outreach
+
+team_members:
+  - name: "Member 1 Full Name"
+    email: "member1@example.com"
+    role: "ML Engineer"          # Optional, e.g. "Team Lead", "Backend", "Data"
+  - name: "Member 2 Full Name"
+    email: "member2@example.com"
+    role: "Data Engineer"
+  # Add more members as needed; solo participants list just one member
+
+# ============================================================================
+# Code and reproducibility
+# ============================================================================
+github_repo: "https://github.com/s-reeshma/India_runs_data_and_ai_challenge-resume-ranking"
+# Required. Must be reachable. Private repos OK if you can grant organizer
+# access at Stage 3 (the email to add will be communicated then).
+
+sandbox_link: "https://colab.research.google.com/drive/1bbacnUOKvEezPGhCVlUtaRm8_b_am8BJ?usp=sharing"
+# Required. A working hosted environment where the ranker can be run on a small
+# candidate sample. See Section 10.5 of submission_spec.md for acceptable
+# platforms (HuggingFace Spaces, Streamlit Cloud, Replit, Colab, Docker, Binder).
+
+reproduce_command: "python rank_candidates.py"
+# The single command that produces submission.csv from candidates.jsonl.
+# Should run end-to-end within 5 minutes on CPU with 16GB RAM and no network.
+
+# ============================================================================
+# Compute environment
+# ============================================================================
+compute:
+  platform: "Windows PC"         
+  cpu_cores: 8                     
+  ram_gb: 16                       
+  python_version: "3.11.4"         
+  os: "Windows 11"                
+  uses_gpu_for_inference: false
+  has_network_during_ranking: false
+  pre_computation_required: false
+  pre_computation_time_minutes: 0              
+
+# ============================================================================
+# AI tools declaration
+# ============================================================================
+# Transparency only — declared use is NOT penalized. Be honest. Stage 5 interview
+# may verify these declarations against your code; declarations that contradict
+# your code or your interview are flagged.
+ai_tools_used:
+  - "Gemini"        # e.g. for architecture discussion, code review
+  - "GitHub Copilot"  # e.g. for autocomplete
+  # Other options: "ChatGPT", "Cursor", "Gemini", "Codeium", "Other", "None"
+
+ai_usage_summary: |
+ "Used Gemini for code optimization, debugging multi-processing behaviors, and architectural
+  planning. Used GitHub Copilot for code auto-completion. No candidate or sensitive data was
+   shared with any external LLM models.."
+
+# ============================================================================
+# Approach summary (optional but recommended)
+# ============================================================================
+methodology_summary: |
+  ≤200 word summary of your approach. Strongly recommended.
+
+  "A Hybrid Semantic & Deterministic Ranking Pipeline combining transformer
+   embeddings with an auditable heuristic engine. Candidates are vectorized using
+    all-MiniLM-L6-v2 to evaluate dense semantic capability against the JD. A Python
+     Rules Engine applies deterministic modifiers to eliminate keyword stuffers via
+      title, job-hopping, and closed-source veteran penalties, while safeguarding 
+      "Hidden Gems" via a capability score override. Finally, candidate ranking 
+      is weighted using a multiplicative modifier derived from behavioral signals
+       (recruiter response rates, active statuses, and interview completion rates). 
+       Optimized via CPU multi-processing to scale across all 8 cores, completing 
+       evaluation of 100K candidates well within the 5-minute compute threshold."
+
+# ============================================================================
+# Declarations
+# ============================================================================
+declarations:
+  read_submission_spec: true        # I have read submission_spec.md in full
+  code_is_original_work: true       # My code is my team's original work (using AI as a tool is fine)
+  no_collusion: true                # I have not coordinated my submission with other teams
+  honeypot_check_done: true        # OPTIONAL — set true if you explicitly checked for honeypots in your ranking
+  reproduction_tested: true         # I have tested that my reproduce_command runs end-to-end
